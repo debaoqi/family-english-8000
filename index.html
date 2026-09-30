@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>亲子英语8000句</title>
+<meta name="description" content="美国家庭万用亲子英文 · 中英对照 · 可离线使用">
+<meta name="theme-color" content="#1f6f5c" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101614" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="亲子英语">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar" id="bar">
+  <button class="icon-btn" id="backBtn" aria-label="返回" hidden>
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <div class="bar-title">
+    <div class="bar-main" id="barTitle">亲子英语8000句</div>
+    <div class="bar-sub" id="barSub">美国家庭万用 · 中英对照</div>
+  </div>
+  <button class="icon-btn" id="searchBtn" aria-label="搜索">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+  </button>
+  <button class="icon-btn" id="settingsBtn" aria-label="设置">
+    <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+  </button>
+</header>
+
+<main id="view" tabindex="-1"></main>
+
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+<section class="sheet" id="settingsSheet" hidden aria-label="阅读设置">
+  <div class="sheet-handle"></div>
+  <h2>阅读设置</h2>
+  <div class="setting">
+    <div class="setting-label">英文字号 <span id="fontVal"></span></div>
+    <div class="stepper">
+      <button id="fontDown" aria-label="缩小">A−</button>
+      <input type="range" id="fontRange" min="15" max="28" step="1">
+      <button id="fontUp" aria-label="放大">A+</button>
+    </div>
+  </div>
+  <div class="setting">
+    <div class="setting-label">中文翻译</div>
+    <div class="seg" id="zhMode">
+      <button data-v="show">显示</button>
+      <button data-v="tap">点击显示</button>
+      <button data-v="hide">隐藏</button>
+    </div>
+  </div>
+  <div class="setting">
+    <div class="setting-label">点击句子朗读英文</div>
+    <div class="seg" id="ttsMode">
+      <button data-v="on">开启</button>
+      <button data-v="off">关闭</button>
+    </div>
+  </div>
+  <div class="setting">
+    <div class="setting-label">朗读语速</div>
+    <div class="seg" id="rateMode">
+      <button data-v="0.7">慢</button>
+      <button data-v="0.9">中</button>
+      <button data-v="1.05">正常</button>
+    </div>
+  </div>
+  <div class="setting">
+    <div class="setting-label">主题</div>
+    <div class="seg" id="themeMode">
+      <button data-v="auto">跟随系统</button>
+      <button data-v="light">浅色</button>
+      <button data-v="dark">深色</button>
+    </div>
+  </div>
+  <p class="sheet-note">所有内容已缓存到本机，断网也能使用。</p>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
