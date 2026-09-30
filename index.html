@@ -63,11 +63,11 @@
     </div>
   </div>
   <div class="setting">
-    <div class="setting-label">朗读语速</div>
+    <div class="setting-label">朗读语速（美式真人发音）</div>
     <div class="seg" id="rateMode">
-      <button data-v="0.7">慢</button>
-      <button data-v="0.9">中</button>
-      <button data-v="1.05">正常</button>
+      <button data-v="0.85">更慢</button>
+      <button data-v="1">慢速</button>
+      <button data-v="1.15">接近正常</button>
     </div>
   </div>
   <div class="setting">
@@ -79,6 +79,13 @@
     </div>
   </div>
   <p class="sheet-note">所有内容已缓存到本机，断网也能使用。</p>
+</section>
+
+<section class="sheet" id="installSheet" hidden aria-label="安装到手机">
+  <div class="sheet-handle"></div>
+  <h2>安装到手机</h2>
+  <div id="installBody"></div>
+  <button class="sheet-close" id="installClose">知道了</button>
 </section>
 
 <div class="toast" id="toast" hidden></div>

@@ -7,7 +7,9 @@
     set(k, v) { try { localStorage.setItem('fe:' + k, JSON.stringify(v)); } catch (e) {} }
   };
 
-  const settings = Object.assign({ font: 19, zh: 'show', tts: 'on', rate: 0.9, theme: 'auto' }, store.get('settings', {}));
+  const settings = Object.assign({ font: 19, zh: 'show', tts: 'on', rate: 1, theme: 'auto' }, store.get('settings', {}));
+  // The recordings are already slowed down, so 1 is the default "slow" pace.
+  if (![0.85, 1, 1.15].includes(settings.rate)) settings.rate = 1;
   let favs = new Set(store.get('favs', []));
   let readSet = new Set(store.get('read', []));
   let openChapters = new Set(store.get('open', [0, 1]));
@@ -50,12 +52,66 @@
   $('#settingsBtn').onclick = openSheet;
   backdrop.onclick = closeSheet;
 
+  // ---------- install ----------
+  let deferredPrompt = null;
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; });
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null; toast('安装成功，可以从桌面图标打开了');
+    const card = $('.install'); if (card) card.remove();
+  });
+  function installGuide() {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const android = /Android/i.test(ua);
+    const inApp = (ua.match(/MicroMessenger|\bQQ\/|Weibo|DingTalk|AlipayClient|Lark|baiduboxapp|aweme|NewsArticle/i) || [])[0];
+    const domestic = /HuaweiBrowser|HONORBrowser|MiuiBrowser|XiaoMi|HeyTapBrowser|OppoBrowser|VivoBrowser|UCBrowser|MQQBrowser|Quark|baidubrowser|SogouMobileBrowser|360 ?(SE|Browser)|2345Explorer/i.test(ua);
+    const steps = s => '<ol class="steps">' + s.map(x => `<li>${x}</li>`).join('') + '</ol>';
+    const net = '<p class="sheet-note">安装时需要联网。如果页面打不开或一直转圈，通常是网络访问 github.io 不稳定，换 Wi-Fi/流量或稍后再试。</p>';
+    if (inApp) {
+      const name = /MicroMessenger/i.test(inApp) ? '微信' : /QQ/i.test(inApp) ? 'QQ' : '这个 App';
+      return `<p><b>现在是在${name}里打开的</b>，${name}的内置浏览器不能安装应用。</p>` +
+        steps(['点右上角 <b>···</b>', `选择 <b>“在浏览器打开”</b>（iPhone 选 Safari）`, '在浏览器里再点首页的“安装到手机”']) + net;
+    }
+    if (ios) {
+      const safari = !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+      return (safari ? '' : '<p>建议用 <b>Safari</b> 打开本网址后安装（其他浏览器在较老的 iOS 上无法添加）。</p>') +
+        steps(['点屏幕底部（iPad 在右上角）的 <b>分享</b> 按钮 <span class="ico">⬆︎</span>', '向下滑动，点 <b>“添加到主屏幕”</b>', '点右上角 <b>“添加”</b>']) + net;
+    }
+    if (android && domestic) {
+      return '<p>这个手机自带浏览器对“安装应用”支持不完整，所以会安装失败。</p>' +
+        steps(['推荐：安装 <b>Chrome</b> 或 <b>Microsoft Edge</b>（应用商店可下载），用它打开本网址', '点右上角 <b>⋮</b> → <b>“安装应用”</b> 或 <b>“添加到主屏幕”</b>',
+               '或者：在当前浏览器菜单里找 <b>“添加到桌面 / 发送到桌面”</b>，也能用，只是不是独立窗口']) + net;
+    }
+    if (android) {
+      return steps(['点浏览器右上角 <b>⋮</b> 菜单', '选择 <b>“安装应用”</b> 或 <b>“添加到主屏幕”</b>', '如果系统提示“桌面快捷方式权限”，请在手机设置里允许该浏览器创建桌面图标']) + net;
+    }
+    return steps(['用 Chrome 或 Edge 打开', '点地址栏右侧的 <b>安装</b> 图标（⊕），或菜单 → “安装此站点为应用”']) +
+      '<p class="sheet-note">手机上安装：用手机浏览器打开同一个网址即可。</p>';
+  }
+  const installSheet = $('#installSheet');
+  function openInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(() => { deferredPrompt = null; });
+      return;
+    }
+    $('#installBody').innerHTML = installGuide();
+    installSheet.hidden = false; backdrop.hidden = false;
+  }
+  const closeInstall = () => { installSheet.hidden = true; backdrop.hidden = true; };
+  $('#installClose').onclick = closeInstall;
+  backdrop.addEventListener('click', closeInstall);
+
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false;
     clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 1600);
   }
 
   // ---------- speech ----------
+  // Every sentence has a pre-recorded neural-voice MP3 (audio/<hash>.mp3, already slowed down).
+  // The phone's built-in TTS is only a fallback when the file can't be loaded, and only with a
+  // real English voice — Chinese TTS engines reading English is what sounded "strange" before.
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   let voice = null;
   function pickVoice() {
@@ -65,14 +121,43 @@
          || vs.find(v => /en[-_]US/i.test(v.lang)) || vs[0] || null;
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
-  function speak(text, onend) {
-    if (!synth) { toast('此浏览器不支持朗读'); return; }
-    synth.cancel();
+  const player = new Audio();
+  player.preload = 'auto';
+  let playToken = 0;
+  function stopSpeech() {
+    playToken++;
+    player.pause();
+    if (synth) synth.cancel();
+  }
+  function ttsFallback(text, onend) {
+    if (!synth || !voice) { toast('音频加载失败，请联网后重试'); if (onend) onend(); return; }
     const u = new SpeechSynthesisUtterance(text.replace(/\s\/\s/g, '. '));
-    u.lang = 'en-US'; if (voice) u.voice = voice;
-    u.rate = settings.rate;
+    u.lang = voice.lang; u.voice = voice;
+    u.rate = 0.8 * settings.rate;
     if (onend) { u.onend = onend; u.onerror = onend; }
     synth.speak(u);
+  }
+  function speak(text, audioId, onend) {
+    stopSpeech();
+    const token = playToken;
+    const done = () => { if (token === playToken && onend) onend(); };
+    if (!audioId) { ttsFallback(text, done); return; }
+    player.src = 'audio/' + audioId + '.mp3';
+    player.playbackRate = settings.rate;
+    player.preservesPitch = player.mozPreservesPitch = player.webkitPreservesPitch = true;
+    player.onended = done;
+    player.onerror = () => { if (token === playToken) ttsFallback(text, done); };
+    player.play().catch(err => { if (token === playToken && err.name !== 'AbortError') ttsFallback(text, done); });
+  }
+  const audioOf = key => { const [ci, si, pi] = key.split('.').map(Number); const p = DATA[ci].secs[si].p[pi]; return p && p[2]; };
+  function speakCard(card, onend) {
+    speak(card.querySelector('.en').textContent, audioOf(card.dataset.key), onend);
+  }
+  // Warm the cache for a section so the sentences play instantly (and offline later).
+  function prefetchSection(sec) {
+    if (!('caches' in window)) return;
+    const urls = sec.p.map(p => p[2] && 'audio/' + p[2] + '.mp3').filter(Boolean);
+    caches.open('fe-audio').then(c => urls.forEach(u => c.match(u).then(hit => hit || c.add(u).catch(() => {}))));
   }
 
   // ---------- helpers ----------
@@ -127,6 +212,11 @@
         <span class="dot"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg></span>
         <span><small>继续阅读</small><b>${esc(secCode(last[0], last[1]))} ${esc(s.t)}</b></span></button>`;
     }
+    if (!isStandalone()) {
+      html += `<button class="continue install" data-install>
+        <span class="dot"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
+        <span><small>添加到手机桌面，离线也能用</small><b>安装到手机</b></span></button>`;
+    }
     html += `<div class="quick">
       <button data-go="#/search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>搜索句子</button>
       <button data-go="#/fav">${starSvg}我的收藏 (${favs.size})</button>
@@ -152,6 +242,7 @@
   view.addEventListener('click', e => {
     const go = e.target.closest('[data-go]');
     if (go) { location.hash = go.dataset.go; return; }
+    if (e.target.closest('[data-install]')) { openInstall(); return; }
     const tog = e.target.closest('.ch-toggle');
     if (tog) {
       const ch = tog.parentElement, ci = +ch.dataset.ci;
@@ -178,14 +269,14 @@
         stopAuto(false);
         document.querySelectorAll('.card.speaking').forEach(c => c.classList.remove('speaking'));
         card.classList.add('speaking');
-        speak(card.querySelector('.en').textContent, () => card.classList.remove('speaking'));
+        speakCard(card, () => card.classList.remove('speaking'));
       }
     }
   });
 
   let autoIdx = -1;
   function stopAuto(cancel = true) {
-    if (autoIdx >= 0 && cancel && synth) synth.cancel();
+    if (autoIdx >= 0 && cancel) stopSpeech();
     autoIdx = -1;
     const f = $('.fab'); if (f) f.innerHTML = playIcon;
   }
@@ -198,9 +289,9 @@
     const card = cards[autoIdx];
     card.classList.add('speaking');
     card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    speak(card.querySelector('.en').textContent, () => {
+    speakCard(card, () => {
       if (autoIdx < 0) return;
-      setTimeout(() => { if (autoIdx >= 0) { autoIdx++; autoNext(); } }, 700);
+      setTimeout(() => { if (autoIdx >= 0) { autoIdx++; autoNext(); } }, 1000);
     });
   }
 
@@ -218,22 +309,22 @@
       : `<span class="empty"></span>`;
     view.innerHTML = `<div class="reader-head"><div class="crumb">${esc(c.n === 0 ? c.name : '第' + c.n + '章 · ' + c.name)}</div>
         <h1>${esc(s.t)}</h1></div>
-      <p class="hint">${s.p.length} 句 · ${synth ? '点击句子朗读英文' : ''}${settings.zh === 'tap' ? '，点击显示中文' : ''}</p>
+      <p class="hint">${s.p.length} 句 · 点击句子朗读英文${settings.zh === 'tap' ? '，点击显示中文' : ''}</p>
       <div class="${isVocab(s) ? 'vocab' : ''}">
         ${s.p.map(([en, zh], pi) => cardHTML(esc(en), esc(zh), `${ci}.${si}.${pi}`, `<div class="idx">${pi + 1}</div>`)).join('')}
       </div>
       <nav class="pager">${link(prev, 'prev', '‹ 上一节')}${link(next, 'next', '下一节 ›')}</nav>
-      ${synth ? `<button class="fab" aria-label="连续朗读">${playIcon}</button>` : ''}`;
+      <button class="fab" aria-label="连续朗读">${playIcon}</button>`;
     const fab = $('.fab');
     if (fab) fab.onclick = () => {
       if (autoIdx >= 0) { stopAuto(); return; }
       const cards = [...document.querySelectorAll('#view .card')];
-      const mid = window.innerHeight / 2;
       let start = cards.findIndex(c => c.getBoundingClientRect().bottom > 80);
       autoIdx = Math.max(0, start);
       fab.innerHTML = stopIcon;
       autoNext();
     };
+    prefetchSection(s);
     window.scrollTo(0, 0);
   }
 
